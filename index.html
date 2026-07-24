@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Todo Quest</title>
+<meta name="description" content="todoがモンスターになるドラクエ風タスク管理RPG">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+:root{
+  --ink:#000; --frame:#fff; --gold:#ffd900; --gray:#9aa0b8;
+  --green:#3cf05a; --red:#ff4040; --gem:#3fd8ff; --mp:#4f8dff;
+  --sky1:#04040f; --sky2:#101038; --ground:#1c1430;
+}
+html{ background:#000; }
+body{ font-family:'DotGothic16',monospace; background:#000; color:#fff; min-height:100vh;
+  padding:18px 14px 32px; image-rendering:pixelated; }
+
+.dq{ background:var(--ink); border:3px solid var(--frame); border-radius:6px;
+  box-shadow:0 0 0 3px var(--ink), 0 0 0 5px var(--frame); padding:14px; }
+.game{ max-width:680px; margin:0 auto; display:flex; flex-direction:column; gap:14px; }
+
+.masthead{ text-align:center; margin-bottom:2px; }
+.masthead .logo{ font-family:'Press Start 2P',monospace; font-size:1.5rem; letter-spacing:2px;
+  color:var(--gold); text-shadow:0 3px 0 #7a4a00, 0 6px 0 #000, 0 0 24px #ffd90033; }
+.masthead .logo .sw{ color:#fff; text-shadow:0 3px 0 #555, 0 6px 0 #000; }
+
+.menubar{ margin:12px auto 0; max-width:680px; display:flex; align-items:center; justify-content:center;
+  border:3px solid var(--frame); border-radius:6px;
+  box-shadow:0 0 0 3px var(--ink), 0 0 0 5px var(--frame); background:var(--ink); overflow:hidden; }
+.menubar .cell{ display:flex; align-items:center; gap:6px; padding:7px 16px; font-size:0.72rem;
+  letter-spacing:1px; border-right:1px solid #2a2a44; }
+.menubar .cell:last-child{ border-right:none; }
+.menubar .k{ color:var(--gray); font-size:0.6rem; }
+.menubar .v{ color:var(--gold); } .menubar .v.gem{ color:var(--gem); }
+.menubar button{ font-family:'DotGothic16',monospace; background:none; border:none; color:#fff;
+  font-size:0.75rem; letter-spacing:2px; cursor:pointer; padding:7px 18px; }
+.menubar button:hover{ background:#1a1a30; color:var(--gold); }
+
+/* 戦闘ウィンドウ */
+.battle{ position:relative; overflow:hidden; border:3px solid var(--frame); border-radius:6px;
+  box-shadow:0 0 0 3px var(--ink), 0 0 0 5px var(--frame);
+  background:
+    linear-gradient(#0000 0 62%, #0006 62%),
+    radial-gradient(ellipse 90% 55% at 50% 108%, var(--ground) 0%, #0d0a20 55%, #0000 78%),
+    radial-gradient(ellipse 130% 90% at 50% -30%, var(--sky2) 0%, var(--sky1) 70%);
+  min-height:290px; padding:22px 16px 18px;
+  display:flex; flex-wrap:wrap; gap:14px 24px; align-items:flex-end; justify-content:center; }
+.battle::after{ content:''; position:absolute; inset:0; pointer-events:none;
+  box-shadow:inset 0 0 70px 20px #000c; }
+.battle .stars{ position:absolute; inset:0 0 40% 0; pointer-events:none;
+  background-image:
+    radial-gradient(1px 1px at 12% 30%, #fff8 50%, #0000 51%),
+    radial-gradient(1px 1px at 30% 12%, #fff6 50%, #0000 51%),
+    radial-gradient(1px 1px at 55% 25%, #fff9 50%, #0000 51%),
+    radial-gradient(1px 1px at 74% 10%, #fff5 50%, #0000 51%),
+    radial-gradient(1px 1px at 88% 34%, #fff7 50%, #0000 51%),
+    radial-gradient(1px 1px at 44% 6%,  #fff6 50%, #0000 51%);
+  animation:twinkle 3.4s ease-in-out infinite alternate; }
+@keyframes twinkle{ from{opacity:.5} to{opacity:1} }
+.battle.peace{ align-items:center;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 108%, #16301a 0%, #08160c 55%, #0000 78%),
+    radial-gradient(ellipse 130% 90% at 50% -30%, #0e2a18 0%, #04120a 70%); }
+.battle.bossmode{
+  background:
+    linear-gradient(#0000 0 62%, #0008 62%),
+    radial-gradient(ellipse 90% 55% at 50% 108%, #2a0d14 0%, #14060c 55%, #0000 78%),
+    radial-gradient(ellipse 130% 90% at 50% -30%, #33101c 0%, #0d0308 70%); }
+.peace-msg{ position:relative; z-index:1; text-align:center; color:var(--gray); font-size:0.82rem;
+  line-height:2.1; width:100%; letter-spacing:2px; }
+.peace-msg .big{ color:#fff; font-size:1rem; }
+
+.monster{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:center;
+  cursor:pointer; width:118px; animation:floaty 2.4s ease-in-out infinite; transition:transform .1s; }
+@keyframes floaty{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+.monster:hover{ transform:scale(1.05); }
+.monster:hover .mon-cursor{ opacity:1; }
+.mon-cursor{ position:absolute; top:34%; left:-14px; color:#fff; font-size:0.85rem; opacity:0;
+  animation:curBlink .5s step-end infinite; text-shadow:2px 2px 0 #000; }
+@keyframes curBlink{ 50%{opacity:0} }
+.monster img{ width:94px; height:94px; object-fit:contain; image-rendering:pixelated;
+  filter:drop-shadow(0 7px 3px #000a); }
+.monster.epic img,.monster.boss img{ width:118px; height:118px; }
+.monster.metal img{ filter:drop-shadow(0 0 9px #9ff) drop-shadow(0 7px 3px #000a); }
+.monster.angry img{ filter:drop-shadow(0 0 12px #f33) drop-shadow(0 7px 3px #000a) saturate(1.6); }
+.monster.angry{ animation:angryShake 0.5s ease-in-out infinite; }
+@keyframes angryShake{ 0%,100%{transform:translateY(0) rotate(0)} 25%{transform:translateY(-3px) rotate(-2deg)} 75%{transform:translateY(-3px) rotate(2deg)} }
+.mon-due{ font-size:0.52rem; margin-top:2px; letter-spacing:1px; text-shadow:1px 1px 0 #000; color:var(--gray); }
+.mon-due.warn{ color:var(--gold); }
+.mon-due.over{ color:var(--red); animation:blink 0.8s step-end infinite; }
+.monster.boss img{ filter:drop-shadow(0 0 14px #f36) drop-shadow(0 7px 3px #000a); }
+.monster.hit{ animation:hitShake .25s steps(2) 2; }
+@keyframes hitShake{ 0%{transform:translateX(0)} 50%{transform:translateX(-7px)} 100%{transform:translateX(7px)} }
+.monster.defeated{ animation:defeat .6s ease forwards; pointer-events:none; }
+@keyframes defeat{ 0%{opacity:1} 40%{opacity:1;filter:brightness(4)} 100%{opacity:0;transform:scale(.55) translateY(12px)} }
+.mon-name{ font-size:0.72rem; margin-top:5px; text-shadow:1px 1px 0 #000; max-width:118px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mon-hpw{ width:86px; height:6px; background:#200; border:1px solid #733; margin-top:4px; }
+.mon-hpb{ height:100%; background:var(--green); transition:width .25s; }
+.mon-tag{ font-size:0.55rem; color:var(--gray); margin-top:3px; letter-spacing:1px; text-shadow:1px 1px 0 #000; }
+.mon-tag .xpn{ color:var(--gold); }
+.mon-del{ position:absolute; top:-8px; right:2px; z-index:2; background:var(--ink); border:1px solid #666;
+  color:#888; font-size:0.6rem; cursor:pointer; width:17px; height:17px; line-height:1; border-radius:3px; }
+.mon-del:hover{ color:var(--red); border-color:var(--red); }
+.dmg-pop{ position:absolute; top:6px; left:50%; transform:translateX(-50%); color:#fff;
+  font-family:'Press Start 2P',monospace; font-size:0.95rem; text-shadow:2px 2px 0 #000;
+  animation:dmgUp .7s ease forwards; pointer-events:none; z-index:3; white-space:nowrap; }
+.dmg-pop.crit{ color:var(--gold); font-size:1.25rem; }
+.dmg-pop.miss{ color:var(--gray); font-size:0.75rem; }
+.dmg-pop.spell{ color:var(--mp); }
+@keyframes dmgUp{ 0%{opacity:1;top:26px} 100%{opacity:0;top:-14px} }
+
+.msg-box{ font-size:0.82rem; min-height:66px; line-height:2; letter-spacing:1.5px; }
+.msg-cursor{ display:inline-block; animation:blink .6s step-end infinite; color:#fff; }
+@keyframes blink{ 50%{opacity:0} }
+
+.bottom{ display:grid; grid-template-columns:0.9fr 1.25fr; gap:14px; }
+.win-title{ display:inline-block; position:relative; top:-25px; margin-bottom:-18px;
+  background:var(--ink); padding:0 8px; left:6px; font-size:0.62rem; color:#fff; letter-spacing:2px; }
+.hero-row{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.hero-row img{ width:52px; height:52px; image-rendering:pixelated; }
+.hero-info .hn{ font-size:0.85rem; } .hero-info .hn span{ color:var(--gold); }
+.hero-info .hc{ font-size:0.6rem; color:var(--gray); margin-top:2px; }
+.stat-line{ display:flex; align-items:center; gap:6px; font-size:0.62rem; margin-bottom:5px; }
+.stat-key{ color:var(--gray); width:44px; flex-shrink:0; }
+.bar-wrap{ flex:1; height:8px; background:#15152a; border:1px solid #3a3a5a; }
+.bar{ height:100%; transition:width .5s; }
+.bar.hp{ background:var(--green); } .bar.xp{ background:var(--gold); } .bar.mp{ background:var(--mp); }
+.stat-val{ font-size:0.55rem; color:var(--gray); width:56px; text-align:right; flex-shrink:0; }
+.atk-line{ display:flex; justify-content:space-between; font-size:0.62rem; color:var(--gray); margin-top:2px; }
+.atk-line b{ color:#fff; font-weight:normal; }
+
+/* まほうトグル */
+.spell-btn{ font-family:'DotGothic16',monospace; width:100%; margin-top:8px;
+  background:#0c0c1c; border:2px solid var(--mp); color:var(--mp); padding:7px;
+  font-size:0.68rem; cursor:pointer; letter-spacing:2px; border-radius:3px; }
+.spell-btn.on{ background:#101a38; color:#fff; box-shadow:0 0 10px #4f8dff66; }
+.spell-btn:disabled{ opacity:.35; cursor:not-allowed; }
+.done-cnt{ font-size:0.6rem; color:var(--gray); margin-top:8px; border-top:1px solid #26263e;
+  padding-top:7px; text-align:center; }
+.done-cnt span{ color:#fff; }
+.boss-meter{ font-size:0.58rem; color:var(--gray); text-align:center; margin-top:4px; }
+.boss-meter b{ color:var(--red); font-weight:normal; }
+
+input[type=text]{ font-family:'DotGothic16',monospace; background:#0c0c1c; border:2px solid #3a3a5a;
+  color:#fff; padding:8px 10px; font-size:0.8rem; width:100%; outline:none; letter-spacing:1px; border-radius:3px; }
+input:focus{ border-color:#fff; } input::placeholder{ color:#44445f; }
+.diff-row{ display:flex; gap:6px; margin:8px 0; }
+.diff-btn{ flex:1; font-family:'DotGothic16',monospace; background:#0c0c1c; border:2px solid #3a3a5a;
+  color:var(--gray); padding:6px 2px; font-size:0.58rem; cursor:pointer; line-height:1.45;
+  border-radius:3px; position:relative; }
+.diff-btn:hover{ border-color:#888; color:#fff; }
+.diff-btn.sel{ border-color:#fff; color:#fff; background:#181830; }
+.diff-btn.sel::before{ content:'▶'; position:absolute; top:2px; left:4px; font-size:0.5rem; color:var(--gold); }
+.diff-btn .xpv{ color:var(--gold); }
+.add-btn{ font-family:'DotGothic16',monospace; width:100%; background:#0c0c1c; border:2px solid #fff;
+  color:#fff; padding:9px; font-size:0.78rem; cursor:pointer; letter-spacing:3px; border-radius:3px; }
+.add-btn:hover{ background:#181830; color:var(--gold); border-color:var(--gold); }
+.add-btn:active{ transform:translate(1px,1px); }
+
+.log-item{ display:flex; justify-content:space-between; font-size:0.62rem; color:var(--gray);
+  padding:4px 2px; border-bottom:1px solid #1c1c30; }
+.log-xp{ color:var(--gold); flex-shrink:0; margin-left:8px; }
+.log-empty{ font-size:0.62rem; color:#3a3a55; text-align:center; padding:6px; }
+
+.ov{ display:none; position:fixed; inset:0; background:#000d; z-index:100;
+  align-items:center; justify-content:center; padding:16px; }
+.ov.show{ display:flex; }
+@keyframes pop{ from{transform:scale(.75);opacity:0} to{transform:scale(1);opacity:1} }
+.lvl-box{ text-align:center; padding:32px 52px; animation:pop .35s ease; }
+.lvl-box .t1{ font-size:0.75rem; color:var(--gray); letter-spacing:3px; margin-bottom:10px; }
+.lvl-box .t2{ font-family:'Press Start 2P',monospace; font-size:2.2rem; color:var(--gold);
+  text-shadow:0 4px 0 #7a4a00, 0 8px 0 #000; }
+.lvl-box .t3{ font-size:0.8rem; color:#fff; margin-top:12px; letter-spacing:2px; }
+.ok-btn{ display:inline-block; margin-top:20px; font-size:0.68rem; color:var(--gray);
+  border:2px solid #3a3a5a; padding:6px 20px; cursor:pointer; background:#0c0c1c;
+  border-radius:3px; letter-spacing:2px; }
+.ok-btn:hover{ border-color:#fff; color:#fff; }
+
+.shop-box{ width:100%; max-width:540px; max-height:88vh; overflow-y:auto; animation:pop .3s ease; }
+.shop-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.shop-head .st{ font-size:0.95rem; letter-spacing:3px; }
+.shop-close{ background:none; border:2px solid #3a3a5a; color:var(--gray);
+  font-family:'DotGothic16',monospace; cursor:pointer; padding:3px 12px; font-size:0.72rem; border-radius:3px; }
+.shop-close:hover{ border-color:#fff; color:#fff; }
+.shop-purse{ display:flex; gap:14px; justify-content:center; margin-bottom:12px; font-size:0.75rem; }
+.shop-purse .g{ color:var(--gold); } .shop-purse .j{ color:var(--gem); }
+.tabs{ display:flex; gap:6px; margin-bottom:14px; }
+.tab{ flex:1; font-family:'DotGothic16',monospace; background:#0c0c1c; border:2px solid #3a3a5a;
+  color:var(--gray); padding:7px; font-size:0.7rem; cursor:pointer; border-radius:3px; letter-spacing:1px; }
+.tab.on{ border-color:#fff; color:#fff; background:#181830; }
+.tab-panel{ display:none; } .tab-panel.on{ display:block; }
+.gacha-hero{ text-align:center; }
+.gacha-hero img{ width:110px; height:110px; image-rendering:pixelated; animation:floaty 2.4s ease-in-out infinite; }
+.gacha-lead{ font-size:0.68rem; color:var(--gray); margin-top:8px; letter-spacing:1px; }
+.gacha-btns{ display:flex; gap:8px; margin-top:14px; }
+.gacha-btn{ flex:1; font-family:'DotGothic16',monospace; padding:11px 6px; font-size:0.7rem;
+  cursor:pointer; line-height:1.6; background:#0c0c1c; border-radius:3px; }
+.gacha-btn.g1{ border:2px solid var(--gold); color:var(--gold); }
+.gacha-btn.g2{ border:2px solid var(--gem); color:var(--gem); }
+.gacha-btn:hover{ filter:brightness(1.35); }
+.gacha-btn:disabled{ opacity:.35; cursor:not-allowed; }
+.gacha-note{ font-size:0.58rem; color:var(--gray); text-align:center; margin-top:12px; line-height:1.8; }
+.collection{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.chara-card{ background:#0c0c1c; border:2px solid #3a3a5a; padding:10px 4px 8px; text-align:center;
+  cursor:pointer; position:relative; border-radius:3px; }
+.chara-card.owned:hover{ border-color:#fff; }
+.chara-card.equipped{ border-color:var(--gold); }
+.chara-card.locked{ opacity:.55; cursor:default; }
+.chara-card img{ width:56px; height:56px; image-rendering:pixelated; }
+.chara-card.locked img{ filter:brightness(0); }
+.chara-card .cn{ font-size:0.6rem; margin-top:4px; }
+.chara-card .cr{ font-size:0.5rem; margin-top:2px; }
+.cr.SSR{ color:#ff5ad0 } .cr.SR{ color:var(--gold) } .cr.R{ color:var(--gem) }
+.chara-card .atkv{ font-size:0.5rem; color:var(--gray); margin-top:2px; }
+.chara-card .badge{ position:absolute; top:3px; right:4px; font-size:0.5rem; color:var(--gold); }
+.chara-card .lockicon{ position:absolute; top:38%; left:50%; transform:translate(-50%,-50%); font-size:1.3rem; }
+.pack{ display:flex; align-items:center; justify-content:space-between; background:#0c0c1c;
+  border:2px solid #3a3a5a; padding:12px; margin-bottom:8px; border-radius:3px; }
+.pack .pl{ font-size:0.75rem; } .pack .amt{ color:var(--gem); } .pack .bonus{ font-size:0.55rem; color:var(--gold); }
+.pack .buy{ font-family:'DotGothic16',monospace; background:#0c0c1c; border:2px solid var(--green);
+  color:var(--green); padding:7px 16px; font-size:0.72rem; cursor:pointer; border-radius:3px; }
+.pack .buy:hover{ filter:brightness(1.4); }
+.demo-note{ font-size:0.58rem; color:#c66; text-align:center; margin-top:12px; line-height:1.8;
+  border-top:1px solid #26263e; padding-top:10px; }
+.gr-box{ text-align:center; padding:28px 40px; animation:pop .35s ease; }
+.gr-box .grt{ font-size:0.75rem; color:var(--gray); letter-spacing:2px; margin-bottom:12px; }
+.gr-box img{ width:126px; height:126px; image-rendering:pixelated; animation:floaty 2s ease-in-out infinite; }
+.gr-box .grn{ font-size:1rem; margin-top:10px; letter-spacing:2px; }
+.gr-box .grr{ font-size:0.7rem; margin-top:6px; }
+
+@media(max-width:600px){
+  .bottom{ grid-template-columns:1fr; }
+  .collection{ grid-template-columns:repeat(2,1fr); }
+  .masthead .logo{ font-size:1.1rem; }
+  .menubar .cell{ padding:6px 10px; }
+}
+@media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="logo"><span class="sw">⚔</span> TODO QUEST</div>
+</div>
+
+<div class="menubar">
+  <div class="cell"><span class="k">Lv</span><span class="v" id="mb-lv">1</span></div>
+  <div class="cell"><span class="k">🪙</span><span class="v" id="gold">0</span></div>
+  <div class="cell"><span class="k">💎</span><span class="v gem" id="gem">0</span></div>
+  <button onclick="openShop()">▶ ショップ</button>
+  <button id="bgm-btn" onclick="toggleBgm()">♪ OFF</button>
+</div>
+
+<div class="game" style="margin-top:14px">
+
+  <div class="battle" id="field"><div class="stars"></div></div>
+
+  <div class="dq msg-box" id="msg">なにを　する？<span class="msg-cursor">▼</span></div>
+
+  <div class="bottom">
+    <div class="dq">
+      <span class="win-title">つよさ</span>
+      <div class="hero-row">
+        <img id="hero-img" src="todo-quest-assets/hero.png" alt="hero" onerror="this.style.display='none'">
+        <div class="hero-info">
+          <div class="hn">Lv.<span id="lv">1</span></div>
+          <div class="hc" id="cls">みならい</div>
+        </div>
+      </div>
+      <div class="stat-line"><span class="stat-key">HP</span><div class="bar-wrap"><div class="bar hp" id="hp-bar" style="width:100%"></div></div><span class="stat-val"><span id="hp">100</span>/100</span></div>
+      <div class="stat-line"><span class="stat-key">MP</span><div class="bar-wrap"><div class="bar mp" id="mp-bar" style="width:100%"></div></div><span class="stat-val" id="mp-val">20/20</span></div>
+      <div class="stat-line"><span class="stat-key">EXP</span><div class="bar-wrap"><div class="bar xp" id="xp-bar" style="width:0%"></div></div><span class="stat-val" id="xp">0/100</span></div>
+      <div class="atk-line"><span>こうげき力 <b id="atk">13</b></span><span>かいしん <b>12%</b></span></div>
+      <div class="atk-line"><span>ぶき <b id="wp-name">なし</b></span></div>
+      <button class="spell-btn" id="spell-btn" onclick="toggleSpell()">🔥 メラ（MP10・3ばい）</button>
+      <div class="done-cnt">たおした まもの　<span id="done">0</span> ひき</div>
+      <div class="boss-meter" id="boss-meter"></div>
+    </div>
+
+    <div class="dq">
+      <span class="win-title">クエスト</span>
+      <input type="text" id="inp" placeholder="やること を にゅうりょく" maxlength="40">
+      <div class="diff-row">
+        <button class="diff-btn sel" data-d="easy" onclick="selD(this)">スライム<br><span class="xpv">+20</span></button>
+        <button class="diff-btn" data-d="normal" onclick="selD(this)">ドラキー<br><span class="xpv">+50</span></button>
+        <button class="diff-btn" data-d="hard" onclick="selD(this)">がいこつ<br><span class="xpv">+100</span></button>
+        <button class="diff-btn" data-d="epic" onclick="selD(this)">ドラゴン<br><span class="xpv">+200</span></button>
+      </div>
+      <div class="diff-row">
+        <button class="diff-btn sel" data-due="0" onclick="selDue(this)">じかん<br>むせいげん</button>
+        <button class="diff-btn" data-due="1" onclick="selDue(this)">1じかん</button>
+        <button class="diff-btn" data-due="3" onclick="selDue(this)">3じかん</button>
+        <button class="diff-btn" data-due="today" onclick="selDue(this)">きょうじゅう</button>
+      </div>
+      <button class="add-btn" onclick="addT()">まものを よびだす</button>
+    </div>
+  </div>
+
+  <div class="dq">
+    <span class="win-title">ぼうけんのきろく</span>
+    <div id="log"><div class="log-empty">まだ きろくが ない</div></div>
+  </div>
+</div>
+
+<!-- level up -->
+<div class="ov" id="lvl-ov">
+  <div class="dq lvl-box">
+    <div class="t1">レベルが あがった！</div>
+    <div class="t2" id="lvl-num">2</div>
+    <div class="t3" id="lvl-cls">ゆうしゃ</div>
+    <div class="ok-btn" onclick="closeLvl()">▶ つづける</div>
+  </div>
+</div>
+
+<!-- gacha result -->
+<div class="ov" id="gr-ov">
+  <div class="dq gr-box">
+    <div class="grt" id="gr-title">あたらしい なかま！</div>
+    <img id="gr-img" src="">
+    <div class="grn" id="gr-name"></div>
+    <div class="grr" id="gr-rare"></div>
+    <div class="ok-btn" onclick="closeGr()">▶ OK</div>
+  </div>
+</div>
+
+<!-- shop -->
+<div class="ov" id="shop-ov">
+  <div class="dq shop-box">
+    <div class="shop-head">
+      <span class="st">どうぐや</span>
+      <button class="shop-close" onclick="closeShop()">とじる</button>
+    </div>
+    <div class="shop-purse">
+      <span class="g">🪙 <span id="s-gold">0</span> G</span>
+      <span class="j">💎 <span id="s-gem">0</span></span>
+    </div>
+    <div class="tabs">
+      <button class="tab on" data-t="gacha" onclick="selTab(this)">ガチャ</button>
+      <button class="tab" data-t="collection" onclick="selTab(this)">なかま</button>
+      <button class="tab" data-t="weapons" onclick="selTab(this)">ぶき</button>
+      <button class="tab" data-t="premium" onclick="selTab(this)">💎</button>
+    </div>
+
+    <div class="tab-panel on" id="panel-gacha">
+      <div class="gacha-hero">
+        <img src="todo-quest-assets/hero_knight.png" onerror="this.style.opacity=.3">
+        <div class="gacha-lead">あたらしい ゆうしゃが なかまに なるぞ</div>
+      </div>
+      <div class="gacha-btns">
+        <button class="gacha-btn g1" id="gacha-gold" onclick="rollGacha('gold')">🪙 ゴールドガチャ<br>100 G</button>
+        <button class="gacha-btn g2" id="gacha-gem" onclick="rollGacha('gem')">💎 プレミアムガチャ<br>5 ジェム ／ SSR 2ばい</button>
+      </div>
+      <div class="gacha-note">
+        つよい なかまほど こうげき力が たかい。<br>
+        ぜんいん そろったら ガチャは ゴールドに かわる。
+      </div>
+    </div>
+
+    <div class="tab-panel" id="panel-collection">
+      <div class="collection" id="collection"></div>
+      <div class="gacha-note">えらんだ なかまの こうげき力で たたかう</div>
+    </div>
+
+    <div class="tab-panel" id="panel-weapons">
+      <div id="weapon-list"></div>
+      <div class="gacha-note">ぶきは ゴールドで かえる。そうびすると こうげき力が あがる。</div>
+    </div>
+
+    <div class="tab-panel" id="panel-premium">
+      <div class="pack"><div class="pl"><span class="amt">💎 12</span></div><button class="buy" onclick="buyGem(12,'¥160')">¥160</button></div>
+      <div class="pack"><div class="pl"><span class="amt">💎 40</span> <span class="bonus">+8 おまけ</span></div><button class="buy" onclick="buyGem(48,'¥490')">¥490</button></div>
+      <div class="pack"><div class="pl"><span class="amt">💎 90</span> <span class="bonus">+25 おまけ</span></div><button class="buy" onclick="buyGem(115,'¥980')">¥980</button></div>
+      <div class="demo-note">これは デモ。じっさいの けっさいは おこなわれない。<br>本番導入には Stripe / ストア課金 の連携が必要。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== マスタ ===== */
+const XP   = {easy:20,normal:50,hard:100,epic:200,metal:500,boss:1000};
+const MHP  = {easy:40,normal:90,hard:160,epic:280,metal:30,boss:600};
+const MON  = {easy:'スライム',normal:'ドラキー',hard:'がいこつナイト',epic:'ドラゴン',metal:'メタルスライム',boss:'まおう'};
+const IMG  = {easy:'mon_easy',normal:'mon_normal',hard:'mon_hard',epic:'mon_epic',metal:'mon_metal',boss:'mon_boss'};
+const CLS  = [{lv:1,n:'みならい'},{lv:5,n:'ぼうけんしゃ'},{lv:10,n:'ゆうしゃ'},{lv:20,n:'えいゆう'},{lv:35,n:'せいきし'},{lv:50,n:'でんせつのゆうしゃ'}];
+const need = lv => Math.floor(100*Math.pow(lv,1.5));
+const CRIT_RATE = 0.12, SPELL_COST = 10, BOSS_EVERY = 10;
+
+const HEROES = [
+  {id:'hero',       name:'ゆうしゃ',    img:'hero',       rare:'R',   mult:1.0},
+  {id:'hero_knight',name:'ナイト',      img:'hero_knight',rare:'SR',  mult:1.15},
+  {id:'hero_ninja', name:'にんじゃ',    img:'hero_ninja', rare:'SR',  mult:1.15},
+  {id:'hero_mage',  name:'まほうつかい',img:'hero_mage',  rare:'SSR', mult:1.3},
+  {id:'hero_hime',  name:'おひめさま',  img:'hero_hime',  rare:'SSR', mult:1.3},
+  {id:'hero_monk',  name:'ぶとうか',    img:'hero_monk',  rare:'SR',  mult:1.2},
+  {id:'hero_king',  name:'おうさま',    img:'hero_king',  rare:'SSR', mult:1.3},
+  {id:'hero_dark',  name:'あんこくきし',img:'hero_dark',  rare:'SSR', mult:1.4},
+];
+
+const WEAPONS = [
+  {id:'wp_copper', name:'どうのつるぎ',    img:'wp_copper', atk:5,  price:200},
+  {id:'wp_steel',  name:'はがねのつるぎ',  img:'wp_steel',  atk:15, price:800},
+  {id:'wp_flame',  name:'ほのおのつるぎ',  img:'wp_flame',  atk:30, price:2500},
+  {id:'wp_legend', name:'でんせつのつるぎ',img:'wp_legend', atk:60, price:8000},
+];
+
+/* ===== セーブ ===== */
+let S = JSON.parse(localStorage.getItem('tq4')||'null') || {
+  xp:0, lv:1, total:0, done:0, gold:0, gem:10, mp:20,
+  todos:[], log:[], owned:['hero'], equipped:'hero', boss:null
+};
+S.gold ??= 0; S.gem ??= 10; S.owned ??= ['hero']; S.equipped ??= 'hero';
+S.mp ??= 20; S.boss ??= null; S.weapons ??= []; S.weapon ??= null; S.hp ??= 100;
+// 旧セーブのtodoにHPを付与
+S.todos.forEach(t=>{ t.hp ??= MHP[t.diff] ?? 40; });
+
+let dsel='easy', dueSel='0', lvQ=[], spellMode=false;
+const OVERDUE_DMG = {easy:5,normal:8,hard:12,epic:18,metal:5,boss:0};
+const save=()=>localStorage.setItem('tq4',JSON.stringify(S));
+
+/* ===== ステータス計算 ===== */
+const maxMp = ()=> 20 + S.lv*2;
+const heroMult = ()=> (HEROES.find(h=>h.id===S.equipped)||HEROES[0]).mult;
+const wpAtk   = ()=> (WEAPONS.find(w=>w.id===S.weapon)||{atk:0}).atk;
+const atkPower = ()=> Math.floor((10 + S.lv*3) * heroMult()) + wpAtk();
+
+function selD(b){document.querySelectorAll('.diff-btn[data-d]').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');dsel=b.dataset.d;}
+function selDue(b){document.querySelectorAll('.diff-btn[data-due]').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');dueSel=b.dataset.due;}
+
+function calcDue(){
+  if(dueSel==='0') return null;
+  const now=new Date();
+  if(dueSel==='today'){ const d=new Date(now); d.setHours(23,59,59,999); return d.getTime(); }
+  return now.getTime() + Number(dueSel)*3600*1000;
+}
+
+function addT(){
+  const i=document.getElementById('inp'); const t=i.value.trim();
+  if(!t){i.focus();return;}
+  let diff=dsel;
+  if(Math.random()<0.08) diff='metal';
+  S.todos.push({id:Date.now(),text:t,diff,hp:MHP[diff],due:calcDue(),charged:0});
+  i.value=''; save(); render();
+  const dueMsg = dueSel==='0' ? '' : '\nじかんぎれに なると おそってくるぞ！';
+  if(diff==='metal') msg('なんと！ メタルスライムが あらわれた！\nかたいぞ…… かいしんのいちげきを ねらえ！');
+  else msg(MON[diff]+'が　あらわれた！\n「'+t+'」'+dueMsg);
+}
+
+/* ===== 期限切れダメージ ===== */
+function tickOverdue(){
+  const now=Date.now();
+  let total=0, attacker=null;
+  S.todos.forEach(t=>{
+    if(!t.due || now < t.due) return;
+    t.charged ??= 0;
+    const hours = Math.floor((now - t.due)/3600000) + 1;  // 期限切れ直後に1回目
+    if(hours > t.charged){
+      const times = hours - t.charged;
+      total += (OVERDUE_DMG[t.diff]||5) * times;
+      t.charged = hours;
+      attacker = t;
+    }
+  });
+  if(total>0){
+    S.hp = Math.max(0, S.hp - total);
+    save(); renderStat(); renderField();
+    msg(MON[attacker.diff]+'の こうげき！\nじかんぎれの まものに '+total+'の ダメージを うけた！');
+    if(S.hp<=0) setTimeout(heroDeath, 1200);
+  }
+}
+function heroDeath(){
+  const lost=Math.floor(S.gold/2);
+  S.gold-=lost; S.hp=100; S.mp=maxMp();
+  // 期限をリセット（連続死亡を防ぐ）
+  S.todos.forEach(t=>{ if(t.due && Date.now()>t.due){ t.due=null; t.charged=0; } });
+  save(); render();
+  msg('ゆうしゃは しんでしまった！\n'+(lost>0?lost+' ゴールドを うしなったが、':'')+'きょうかいで いきかえった！');
+}
+
+/* ===== 戦闘 ===== */
+function toggleSpell(){
+  if(S.mp < SPELL_COST){ msg('MPが たりない！'); return; }
+  spellMode = !spellMode;
+  document.getElementById('spell-btn').classList.toggle('on', spellMode);
+  if(spellMode) msg('つぎの こうげきは メラ だ！');
+}
+
+function calcDamage(diff){
+  const crit = Math.random() < CRIT_RATE;
+  const spell = spellMode && S.mp >= SPELL_COST;
+  let dmg = Math.round(atkPower() * (0.75 + Math.random()*0.5));
+  if(spell) dmg *= 3;
+  if(crit)  dmg *= 2;
+  // メタル：会心か魔法以外は ほぼ通らない
+  if(diff==='metal' && !crit && !spell) dmg = Math.random()<0.5 ? 1 : 0;
+  return {dmg, crit, spell};
+}
+
+function attack(id, isBoss=false){
+  const target = isBoss ? S.boss : S.todos.find(t=>t.id===id);
+  if(!target) return;
+  const el = document.getElementById(isBoss ? 'mboss' : 'm'+id);
+  if(!el || el.classList.contains('defeated')) return;
+
+  const {dmg, crit, spell} = calcDamage(isBoss?'boss':target.diff);
+  if(spell){ S.mp -= SPELL_COST; spellMode=false; document.getElementById('spell-btn').classList.remove('on'); }
+
+  const pop=document.createElement('div');
+  pop.className='dmg-pop'+(crit?' crit':dmg===0?' miss':spell?' spell':'');
+  pop.textContent = dmg===0 ? 'ミス!' : dmg;
+  el.appendChild(pop);
+  setTimeout(()=>pop.remove(),700);
+
+  if(dmg>0){ el.classList.add('hit'); setTimeout(()=>el.classList.remove('hit'),500); }
+
+  target.hp -= dmg;
+  const name = isBoss ? 'まおう' : target.text;
+  if(crit)       msg('かいしんの いちげき！！\n'+name+'に '+dmg+'の ダメージ！');
+  else if(spell) msg('ゆうしゃは メラを となえた！\n'+name+'に '+dmg+'の ダメージ！');
+  else if(dmg===0) msg('ミス！ '+MON[isBoss?'boss':target.diff]+'には きかなかった！');
+
+  if(target.hp <= 0){
+    el.classList.add('defeated');
+    setTimeout(()=>{
+      if(isBoss){ S.boss=null; gain(XP.boss,{text:'まおう',diff:'boss'},true); }
+      else { S.todos = S.todos.filter(t=>t.id!==id); gain(XP[target.diff],target,false); }
+    },600);
+  } else {
+    const bar = el.querySelector('.mon-hpb');
+    if(bar) bar.style.width = Math.max(0, target.hp/MHP[isBoss?'boss':target.diff]*100)+'%';
+    save(); renderStat();
+  }
+}
+
+function gain(xp,todo,isBoss){
+  S.xp+=xp; S.total+=xp; S.done++; S.gold+=xp;
+  S.mp = Math.min(maxMp(), S.mp+5);
+  S.hp = Math.min(100, S.hp+8);
+  S.log.unshift({text:todo.text,xp}); if(S.log.length>30)S.log.pop();
+
+  let extra='';
+  if(isBoss){
+    S.gem+=2; extra='\n💎2こ てにいれた！';
+  } else {
+    // たからばこドロップ
+    const r=Math.random();
+    if(r<0.05){ S.gem+=1; extra='\nたからばこだ！ 💎1こ てにいれた！'; }
+    else if(r<0.25){ const g=20+Math.floor(Math.random()*30); S.gold+=g; extra='\nたからばこだ！ '+g+'G てにいれた！'; }
+  }
+
+  // ボス出現判定
+  if(!isBoss && S.done % BOSS_EVERY === 0 && !S.boss){
+    S.boss = {hp:MHP.boss};
+    extra += '\n……じめんが ゆれている！？';
+  }
+
+  let up=false;
+  while(S.xp>=need(S.lv)){ S.xp-=need(S.lv); S.lv++; S.mp=maxMp(); lvQ.push(S.lv); up=true; }
+  save(); render();
+  msg(todo.text+'を たおした！\n'+xp+' EXP と '+xp+' Gを かくとく！'+extra);
+  if(S.boss && extra.includes('ゆれて')) setTimeout(()=>msg('まおうが あらわれた！！\nたおせば 1000 EXP と 💎2 だ！'),2600);
+  if(up) setTimeout(nextLvl,900);
+}
+
+function nextLvl(){ if(!lvQ.length)return; const lv=lvQ.shift();
+  const c=[...CLS].reverse().find(x=>lv>=x.lv)||CLS[0];
+  document.getElementById('lvl-num').textContent=lv;
+  document.getElementById('lvl-cls').textContent=c.n;
+  document.getElementById('lvl-ov').classList.add('show'); }
+function closeLvl(){ document.getElementById('lvl-ov').classList.remove('show'); if(lvQ.length)setTimeout(nextLvl,300); }
+function delT(id){ S.todos=S.todos.filter(t=>t.id!==id); save(); render(); }
+
+/* ===== メッセージ（タイプライター） ===== */
+let mt, tw;
+function msg(t){
+  clearTimeout(mt); clearInterval(tw);
+  const el=document.getElementById('msg');
+  const plain=t.replace(/\n/g,' ');
+  let i=0; el.innerHTML='';
+  tw=setInterval(()=>{
+    i++;
+    if(i>plain.length){
+      clearInterval(tw);
+      el.innerHTML=esc(t).replace(/\n/g,'<br>')+'　<span class="msg-cursor">▼</span>';
+      mt=setTimeout(()=>{ el.innerHTML='なにを　する？<span class="msg-cursor">▼</span>'; },5000);
+      return;
+    }
+    el.innerHTML=esc(plain.slice(0,i)).replace(/ /g,'<br>');
+  },20);
+}
+
+/* ===== SHOP ===== */
+function openShop(){ document.getElementById('shop-ov').classList.add('show'); renderShop(); }
+function closeShop(){ document.getElementById('shop-ov').classList.remove('show'); }
+function selTab(b){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  document.getElementById('panel-'+b.dataset.t).classList.add('on');
+  if(b.dataset.t==='collection') renderCollection();
+  if(b.dataset.t==='weapons') renderWeapons();
+}
+
+/* ぶき */
+function buyWeapon(id){
+  const w=WEAPONS.find(x=>x.id===id); if(!w) return;
+  if(S.weapons.includes(id)) return;
+  if(S.gold < w.price){ closeShop(); msg('ゴールドが たりない！'); return; }
+  S.gold -= w.price; S.weapons.push(id); S.weapon = id;
+  save(); renderShop(); renderWeapons(); renderStat();
+}
+function equipWeapon(id){
+  if(!S.weapons.includes(id)) return;
+  S.weapon = (S.weapon===id) ? null : id;
+  save(); renderWeapons(); renderStat();
+}
+function buyHerb(){
+  if(S.gold<50){ closeShop(); msg('ゴールドが たりない！'); return; }
+  if(S.hp>=100){ msg('HPは まんたんだ！'); return; }
+  S.gold-=50; S.hp=Math.min(100,S.hp+30);
+  save(); renderShop(); renderWeapons(); renderStat();
+  msg('やくそうを つかった！ HPが 30 かいふくした！');
+}
+function renderWeapons(){
+  const el=document.getElementById('weapon-list');
+  el.innerHTML=`<div class="pack">
+      <div class="pl" style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.6rem">🌿</span>
+        <span>やくそう<br><span class="bonus">HP +30 かいふく</span></span>
+      </div>
+      <button class="buy" onclick="buyHerb()" ${S.gold<50?'disabled style="opacity:.35"':''}>50 G</button>
+    </div>`
+  + WEAPONS.map(w=>{
+    const owned=S.weapons.includes(w.id);
+    const eq=S.weapon===w.id;
+    const btn = !owned
+      ? `<button class="buy" onclick="buyWeapon('${w.id}')" ${S.gold<w.price?'disabled style="opacity:.35"':''}>${w.price.toLocaleString()} G</button>`
+      : eq
+        ? `<button class="buy" style="border-color:var(--gold);color:var(--gold)" onclick="equipWeapon('${w.id}')">そうび中</button>`
+        : `<button class="buy" style="border-color:#888;color:#aaa" onclick="equipWeapon('${w.id}')">そうびする</button>`;
+    return `<div class="pack">
+      <div class="pl" style="display:flex;align-items:center;gap:10px">
+        <img src="todo-quest-assets/${w.img}.png" style="width:40px;height:40px;image-rendering:pixelated;${owned?'':'filter:grayscale(1) brightness(.5)'}">
+        <span>${w.name}<br><span class="bonus">こうげき +${w.atk}</span></span>
+      </div>
+      ${btn}
+    </div>`;
+  }).join('');
+}
+function rollGacha(cur){
+  const cost = cur==='gold'?100:5;
+  const have = cur==='gold'?S.gold:S.gem;
+  if(have<cost){ closeShop(); msg(cur==='gold'?'ゴールドが たりない！':'ジェムが たりない！'); return; }
+  if(cur==='gold') S.gold-=cost; else S.gem-=cost;
+  const locked = HEROES.filter(h=>!S.owned.includes(h.id));
+  if(locked.length===0){
+    const back=cur==='gold'?120:200; S.gold+=back; save(); renderShop(); renderStat();
+    showGr(null, back); return;
+  }
+  const weight = h=>{
+    let w = h.rare==='SSR'?1 : h.rare==='SR'?4 : 10;
+    if(cur==='gem' && h.rare==='SSR') w*=2;
+    return w;
+  };
+  const total=locked.reduce((s,h)=>s+weight(h),0);
+  let r=Math.random()*total, pick=locked[0];
+  for(const h of locked){ r-=weight(h); if(r<=0){pick=h;break;} }
+  S.owned.push(pick.id); save(); renderShop(); renderStat();
+  showGr(pick, 0);
+}
+function showGr(hero, goldBack){
+  const box=document.getElementById('gr-ov');
+  if(hero){
+    document.getElementById('gr-title').textContent='あたらしい なかま！';
+    document.getElementById('gr-img').src='todo-quest-assets/'+hero.img+'.png';
+    document.getElementById('gr-img').style.display='';
+    document.getElementById('gr-name').textContent=hero.name;
+    document.getElementById('gr-rare').innerHTML='<span class="cr '+hero.rare+'">★ '+hero.rare+' ★　こうげき x'+hero.mult+'</span>';
+  } else {
+    document.getElementById('gr-title').textContent='なかまは ぜんいん そろっている';
+    document.getElementById('gr-img').style.display='none';
+    document.getElementById('gr-name').textContent=goldBack+' ゴールドを てにいれた！';
+    document.getElementById('gr-rare').innerHTML='';
+  }
+  box.classList.add('show');
+}
+function closeGr(){ document.getElementById('gr-ov').classList.remove('show'); }
+function equip(id){ if(!S.owned.includes(id))return; S.equipped=id; save(); renderCollection(); renderStat(); }
+function buyGem(amt, price){
+  if(!confirm(price+' で '+amt+' ジェムを こうにゅう しますか？\n（デモ：実際の請求はありません）')) return;
+  S.gem+=amt; save(); renderShop(); renderStat();
+}
+function renderShop(){
+  document.getElementById('s-gold').textContent=S.gold.toLocaleString();
+  document.getElementById('s-gem').textContent=S.gem;
+  document.getElementById('gacha-gold').disabled = S.gold<100;
+  document.getElementById('gacha-gem').disabled  = S.gem<5;
+}
+function renderCollection(){
+  const el=document.getElementById('collection');
+  el.innerHTML=HEROES.map(h=>{
+    const owned=S.owned.includes(h.id);
+    const eq=S.equipped===h.id;
+    return `<div class="chara-card ${owned?'owned':'locked'} ${eq?'equipped':''}" ${owned?`onclick="equip('${h.id}')"`:''}>
+      ${eq?'<span class="badge">そうび中</span>':''}
+      <img src="todo-quest-assets/${h.img}.png">
+      ${owned?'':'<span class="lockicon">🔒</span>'}
+      <div class="cn">${owned?h.name:'？？？'}</div>
+      <div class="cr ${h.rare}">★${h.rare}</div>
+      <div class="atkv">こうげき x${h.mult}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ===== RENDER ===== */
+function render(){ renderField(); renderStat(); renderLog(); }
+function dueLabel(t){
+  if(!t.due) return '';
+  const left = t.due - Date.now();
+  if(left <= 0) return '<div class="mon-due over">おこっている！</div>';
+  const h=Math.floor(left/3600000), m=Math.floor(left%3600000/60000);
+  const txt = h>0 ? `あと${h}じかん${m}ふん` : `あと${m}ふん`;
+  return `<div class="mon-due ${left<1800000?'warn':''}">⏳ ${txt}</div>`;
+}
+function monsterHtml(t){
+  const angry = t.due && Date.now()>t.due ? ' angry' : '';
+  return `
+    <div class="monster ${t.diff}${angry}" id="m${t.id}" onclick="attack(${t.id})">
+      <span class="mon-cursor">▶</span>
+      <button class="mon-del" onclick="event.stopPropagation();delT(${t.id})">✕</button>
+      <img src="todo-quest-assets/${IMG[t.diff]}.png" alt="" onerror="this.style.opacity=.3">
+      <div class="mon-name">${esc(t.text)}</div>
+      <div class="mon-hpw"><div class="mon-hpb" style="width:${Math.max(0,t.hp/MHP[t.diff]*100)}%"></div></div>
+      <div class="mon-tag">${MON[t.diff]}　<span class="xpn">+${XP[t.diff]}</span></div>
+      ${dueLabel(t)}
+    </div>`;
+}
+function bossHtml(){
+  return `
+    <div class="monster boss" id="mboss" onclick="attack(0,true)">
+      <span class="mon-cursor">▶</span>
+      <img src="todo-quest-assets/mon_boss.png" alt="" onerror="this.style.opacity=.3">
+      <div class="mon-name" style="color:#ff6688">まおう</div>
+      <div class="mon-hpw"><div class="mon-hpb" style="width:${Math.max(0,S.boss.hp/MHP.boss*100)}%"></div></div>
+      <div class="mon-tag">ボス　<span class="xpn">+${XP.boss}</span></div>
+    </div>`;
+}
+function renderField(){
+  const f=document.getElementById('field');
+  const stars='<div class="stars"></div>';
+  f.classList.toggle('bossmode', !!S.boss);
+  if(!S.todos.length && !S.boss){
+    f.classList.add('peace');
+    f.innerHTML='<div class="peace-msg"><span class="big">あたりは しずかだ……</span><br>クエストを かきこむと まものが あらわれる</div>'; return;
+  }
+  f.classList.remove('peace');
+  f.innerHTML=stars+(S.boss?bossHtml():'')+S.todos.map(monsterHtml).join('');
+}
+function renderStat(){
+  const lv=S.lv, nd=need(lv), mm=maxMp();
+  const hp=S.hp;
+  document.getElementById('lv').textContent=lv;
+  document.getElementById('mb-lv').textContent=lv;
+  document.getElementById('xp-bar').style.width=Math.min(100,S.xp/nd*100)+'%';
+  document.getElementById('xp').textContent=S.xp+'/'+nd;
+  document.getElementById('hp-bar').style.width=hp+'%';
+  document.getElementById('hp').textContent=hp;
+  document.getElementById('hp-bar').style.background=hp>50?'#3cf05a':hp>25?'#ffd900':'#ff4040';
+  document.getElementById('mp-bar').style.width=(S.mp/mm*100)+'%';
+  document.getElementById('mp-val').textContent=S.mp+'/'+mm;
+  document.getElementById('atk').textContent=atkPower();
+  document.getElementById('wp-name').textContent=(WEAPONS.find(w=>w.id===S.weapon)||{name:'なし'}).name;
+  document.getElementById('done').textContent=S.done;
+  document.getElementById('cls').textContent=([...CLS].reverse().find(c=>lv>=c.lv)||CLS[0]).n;
+  document.getElementById('gold').textContent=S.gold.toLocaleString();
+  document.getElementById('gem').textContent=S.gem;
+  document.getElementById('spell-btn').disabled = S.mp < SPELL_COST;
+  const bm=document.getElementById('boss-meter');
+  bm.innerHTML = S.boss ? '<b>まおうと せんとうちゅう！</b>'
+    : 'あと <b>'+(BOSS_EVERY - S.done % BOSS_EVERY)+'</b> ひきで まおう しゅつげん';
+  const eh=HEROES.find(h=>h.id===S.equipped)||HEROES[0];
+  const himg=document.getElementById('hero-img'); himg.src='todo-quest-assets/'+eh.img+'.png'; himg.style.display='';
+}
+function renderLog(){
+  const el=document.getElementById('log');
+  if(!S.log.length){el.innerHTML='<div class="log-empty">まだ きろくが ない</div>';return;}
+  el.innerHTML=S.log.map(l=>`<div class="log-item"><span>${esc(l.text)}</span><span class="log-xp">＋${l.xp} EXP</span></div>`).join('');
+}
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+document.getElementById('inp').addEventListener('keydown',e=>{if(e.key==='Enter')addT();});
+
+/* ===== BGM (Mureka生成・ファイル待ち) ===== */
+const BGM_FILES = { peace:'todo-quest-assets/bgm_field.mp3', battle:'todo-quest-assets/bgm_battle.mp3' };
+const bgm = { on:false, cur:null, audio:new Audio() };
+bgm.audio.loop = true; bgm.audio.volume = 0.35;
+function bgmTrack(){ return (S.todos.length||S.boss) ? 'battle' : 'peace'; }
+function updateBgm(){
+  if(!bgm.on) return;
+  const t = bgmTrack();
+  if(bgm.cur === t) return;
+  bgm.cur = t; bgm.audio.src = BGM_FILES[t];
+  bgm.audio.play().catch(()=>{});
+}
+function toggleBgm(){
+  bgm.on = !bgm.on;
+  document.getElementById('bgm-btn').textContent = bgm.on ? '♪ ON' : '♪ OFF';
+  if(bgm.on){ bgm.cur=null; updateBgm(); }
+  else { bgm.audio.pause(); bgm.cur=null; }
+}
+const _renderField = renderField;
+renderField = function(){ _renderField(); updateBgm(); };
+
+render();
+tickOverdue();                       // 起動時に不在中の期限切れを精算
+setInterval(tickOverdue, 60*1000);   // 1分ごとにチェック
+setInterval(renderField, 60*1000);   // 残り時間表示の更新
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>

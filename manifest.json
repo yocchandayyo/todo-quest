@@ -1,0 +1,17 @@
+{
+  "name": "Todo Quest - まものを たおして タスク管理",
+  "short_name": "Todo Quest",
+  "description": "todoがモンスターになるドラクエ風タスク管理RPG。クエストをこなして経験値を稼ぎ、ガチャで仲間を集めよう。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "lang": "ja",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
