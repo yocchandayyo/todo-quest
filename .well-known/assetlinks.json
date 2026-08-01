@@ -3,6 +3,6 @@
       "target": {
         "namespace": "android_app",
         "package_name": "io.github.yocchandayyo.todoquest",
-        "sha256_cert_fingerprints": ["21:E4:B5:D2:0E:3B:2D:1E:41:76:6B:19:24:F9:25:C8:BC:26:D6:B0:8C:60:72:15:BC:01:A7:26:C4:91:8F:74"]
+        "sha256_cert_fingerprints": ["E5:B3:3D:13:5F:63:99:10:7C:19:25:A9:E8:55:15:27:45:C4:43:D0:F0:56:78:91:C1:F9:82:62:4D:FF:8D:1A"]
       }
     }]
