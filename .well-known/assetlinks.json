@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.yocchandayyo.todoquest",
+        "sha256_cert_fingerprints": ["21:E4:B5:D2:0E:3B:2D:1E:41:76:6B:19:24:F9:25:C8:BC:26:D6:B0:8C:60:72:15:BC:01:A7:26:C4:91:8F:74"]
+      }
+    }]
